@@ -3,118 +3,367 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TalkSpace - Мессенджер</title>
-    <link rel="stylesheet" href="style.css">
+    <title>TalkSpace</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: Arial; 
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .app { 
+            width: 800px; height: 600px; 
+            background: white; border-radius: 15px;
+            display: flex; overflow: hidden;
+        }
+        .sidebar { width: 100%; display: flex; flex-direction: column; }
+        
+        .auth-screen { 
+            position: fixed; top: 0; left: 0; 
+            width: 100%; height: 100%; 
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex; justify-content: center; align-items: center;
+        }
+        .auth-container { 
+            background: white; padding: 40px; 
+            border-radius: 15px; width: 350px; text-align: center;
+        }
+        .auth-input { 
+            width: 100%; padding: 12px; margin: 8px 0; 
+            border: 1px solid #ddd; border-radius: 8px;
+        }
+        .auth-btn { 
+            width: 100%; padding: 12px; margin-top: 10px;
+            background: #667eea; color: white; border: none;
+            border-radius: 8px; cursor: pointer;
+        }
+        
+        .user-panel { 
+            padding: 15px; background: #f5f5f5; 
+            display: flex; justify-content: space-between;
+        }
+        .tabs { display: flex; background: #f5f5f5; }
+        .tab-btn { 
+            flex: 1; padding: 12px; border: none; 
+            background: none; cursor: pointer;
+        }
+        .tab-btn.active { background: white; border-bottom: 2px solid #667eea; }
+        
+        .tab-content { 
+            flex: 1; display: none; flex-direction: column;
+        }
+        .tab-content.active { display: flex; }
+        
+        .friends-list, .search-results, .requests-list { 
+            flex: 1; padding: 10px; overflow-y: auto;
+        }
+        .friend-item, .user-result, .request-item {
+            padding: 12px; border-bottom: 1px solid #eee;
+            cursor: pointer; display: flex; align-items: center;
+        }
+        .friend-item:hover { background: #f9f9f9; }
+        
+        .messages { 
+            flex: 1; padding: 15px; overflow-y: auto;
+            background: #f9f9f9;
+        }
+        .message { 
+            margin: 8px 0; padding: 10px; border-radius: 10px;
+            max-width: 80%; animation: appear 0.3s;
+        }
+        .message.own { 
+            background: #667eea; color: white; 
+            margin-left: auto; 
+        }
+        .message.other { background: white; border: 1px solid #ddd; }
+        
+        .message-input { 
+            padding: 15px; background: white; 
+            border-top: 1px solid #eee; display: flex; gap: 10px;
+        }
+        .message-input input { 
+            flex: 1; padding: 12px; 
+            border: 1px solid #ddd; border-radius: 20px;
+        }
+        .message-input button { 
+            padding: 12px 20px; background: #667eea; 
+            color: white; border: none; border-radius: 20px; cursor: pointer;
+        }
+        
+        @keyframes appear {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
 </head>
 <body>
+    <!-- Экран авторизации -->
     <div id="authScreen" class="auth-screen">
         <div class="auth-container">
-            <div class="app-header">
-                <h1>💬 TalkSpace</h1>
-                <p class="app-subtitle">Ваше пространство для общения</p>
+            <h1>💬 TalkSpace</h1>
+            <p>Простой мессенджер</p>
+            
+            <div style="margin: 20px 0;">
+                <input type="text" id="usernameInput" placeholder="Имя пользователя" class="auth-input">
+<input type="password" id="passwordInput" placeholder="Пароль" class="auth-input">
+                <button onclick="register()" class="auth-btn">Регистрация</button>
+                <button onclick="login()" class="auth-btn">Вход</button>
             </div>
-
-            <div class="auth-tabs">
-                <button class="auth-tab active" onclick="showAuthTab('login')">Вход</button>
-                <button class="auth-tab" onclick="showAuthTab('register')">Регистрация</button>
-            </div>
-
-            <div id="loginTab" class="auth-form active">
-                <input type="text" id="loginUsername" placeholder="Имя пользователя" class="auth-input">
-                <input type="password" id="loginPassword" placeholder="Пароль" class="auth-input">
-                <button onclick="login()" class="auth-btn">Войти в TalkSpace</button>
-            </div>
-
-            <div id="registerTab" class="auth-form">
-                <input type="text" id="registerUsername" placeholder="Придумайте имя пользователя" class="auth-input">
-                <input type="password" id="registerPassword" placeholder="Придумайте пароль" class="auth-input">
-                <div class="avatar-selection">
-                    <div class="avatar-option selected" onclick="selectAvatar(this, 'default')">
-                        <img src="https://ui-avatars.com/api/?name=User&background=667eea&color=fff" alt="Аватар">
-                    </div>
-                    <div class="avatar-option" onclick="selectAvatar(this, 'male')">
-                        <img src="https://ui-avatars.com/api/?name=User&background=4CAF50&color=fff" alt="Аватар">
-                    </div>
-                    <div class="avatar-option" onclick="selectAvatar(this, 'female')">
-                        <img src="https://ui-avatars.com/api/?name=User&background=E91E63&color=fff" alt="Аватар">
-                    </div>
-                </div>
-                <button onclick="register()" class="auth-btn">Создать аккаунт</button>
-            </div>
-
-            <div id="authError" class="error-message"></div>
+            
+            <div id="authError" style="color: red; margin-top: 10px;"></div>
         </div>
     </div>
 
+    <!-- Основное приложение -->
     <div id="appScreen" class="app" style="display: none;">
         <div class="sidebar">
-            <div class="app-header">
-                <h1>💬 TalkSpace</h1>
-                <p class="app-subtitle" id="welcomeText">Добро пожаловать!</p>
-            </div>
-
+            <!-- Панель пользователя -->
             <div class="user-panel">
-                <div class="user-info">
-                    <img id="userAvatar" src="" alt="Аватар" class="user-avatar">
-                    <span id="userName"></span>
-                </div>
-                <button onclick="logout()" class="logout-btn">Выйти</button>
+                <span id="userName">Пользователь</span>
+                <button onclick="logout()">Выйти</button>
             </div>
             
+            <!-- Вкладки -->
             <div class="tabs">
-                <button class="tab-btn active" onclick="openTab('friends')">👥 Друзья</button>
-                <button class="tab-btn" onclick="openTab('search')">🔍 Поиск</button>
-                <button class="tab-btn" onclick="openTab('requests')">📨 Заявки</button>
-                <button class="tab-btn" onclick="openTab('global')">🌍 Общий чат</button>
+                <button class="tab-btn active" onclick="openTab('friends')">Друзья</button>
+                <button class="tab-btn" onclick="openTab('search')">Поиск</button>
+                <button class="tab-btn" onclick="openTab('requests')">Заявки</button>
+                <button class="tab-btn" onclick="openTab('global')">Общий чат</button>
             </div>
 
-            <!-- Вкладка Друзья -->
+            <!-- Содержимое вкладок -->
             <div id="friendsTab" class="tab-content active">
-                <div class="friends-list" id="friendsList">
-                    <div class="empty-state">У вас пока нет друзей</div>
-                </div>
-                <div class="private-chat" id="privateChat" style="display: none;">
-                    <div class="chat-header" id="privateChatHeader"></div>
+                <div class="friends-list" id="friendsList"></div>
+                <div id="privateChat" style="display: none;">
                     <div class="messages" id="privateMessages"></div>
-<div class="message-input">
+                    <div class="message-input">
                         <input type="text" id="privateMessageInput" placeholder="Сообщение...">
                         <button onclick="sendPrivateMessage()">➤</button>
                     </div>
                 </div>
             </div>
 
-            <!-- Вкладка Поиск -->
             <div id="searchTab" class="tab-content">
-                <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="Введите имя пользователя..." oninput="searchUsers()">
+                <div style="padding: 15px;">
+                    <input type="text" id="searchInput" placeholder="Поиск пользователей..." 
+                           oninput="searchUsers()" style="width: 100%; padding: 10px;">
                 </div>
-                <div class="search-results" id="searchResults">
-                    <div class="empty-state">Начните поиск пользователей</div>
-                </div>
+                <div class="search-results" id="searchResults"></div>
             </div>
 
-            <!-- Вкладка Заявки -->
             <div id="requestsTab" class="tab-content">
-                <div class="requests-list" id="requestsList">
-                    <div class="empty-state">Заявок в друзья нет</div>
-                </div>
+                <div class="requests-list" id="requestsList"></div>
             </div>
 
-            <!-- Вкладка Общий чат -->
             <div id="globalTab" class="tab-content">
-                <div class="global-chat">
-                    <div class="chat-header">🌍 Общий TalkSpace</div>
-                    <div class="messages" id="globalMessages"></div>
-                    <div class="message-input">
-                        <input type="text" id="globalMessageInput" placeholder="Сообщение в общий чат...">
-                        <button onclick="sendGlobalMessage()">➤</button>
-                    </div>
+                <div class="messages" id="globalMessages"></div>
+                <div class="message-input">
+                    <input type="text" id="globalMessageInput" placeholder="Сообщение в общий чат...">
+                    <button onclick="sendGlobalMessage()">➤</button>
                 </div>
             </div>
         </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js"></script>
+    <script>
+        let socket = io();
+        let currentUser = null;
+        let currentChat = null;
+
+        function register() {
+            const username = document.getElementById('usernameInput').value;
+            const password = document.getElementById('passwordInput').value;
+            if (username && password) {
+                socket.emit('register', { username, password });
+            }
+        }
+
+        function login() {
+            const username = document.getElementById('usernameInput').value;
+            const password = document.getElementById('passwordInput').value;
+            if (username && password) {
+                socket.emit('login', { username, password });
+            }
+        }
+
+        function logout() {
+            currentUser = null;
+            document.getElementById('authScreen').style.display = 'flex';
+            document.getElementById('appScreen').style.display = 'none';
+        }
+
+        function openTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(tabName + 'Tab').classList.add('active');
+        }
+function searchUsers() {
+            const query = document.getElementById('searchInput').value;
+            if (query.length > 1) socket.emit('search_users', query);
+        }
+
+        function sendFriendRequest(username) {
+            socket.emit('send_friend_request', username);
+        }
+
+        function acceptFriendRequest(username) {
+            socket.emit('accept_friend_request', username);
+        }
+
+        function openPrivateChat(friend) {
+            currentChat = friend.username;
+            document.getElementById('privateChat').style.display = 'flex';
+            document.getElementById('privateMessages').innerHTML = '';
+            socket.emit('load_chat_history', friend.username);
+        }
+
+        function sendPrivateMessage() {
+            const input = document.getElementById('privateMessageInput');
+            const text = input.value.trim();
+            if (text && currentChat) {
+                socket.emit('private_message', { to: currentChat, text });
+                input.value = '';
+            }
+        }
+
+        function sendGlobalMessage() {
+            const input = document.getElementById('globalMessageInput');
+            const text = input.value.trim();
+            if (text) {
+                socket.emit('global_message', text);
+                input.value = '';
+            }
+        }
+
+        // Обработчики событий
+        socket.on('register_success', (data) => {
+            currentUser = data.user;
+            showApp();
+        });
+
+        socket.on('login_success', (data) => {
+            currentUser = data.user;
+            showApp();
+            updateFriendsList(data.friends);
+            updateRequestsList(data.requests);
+        });
+
+        socket.on('register_error', showError);
+        socket.on('login_error', showError);
+        
+        socket.on('search_results', (results) => {
+            const html = results.map(user => 
+                <div class="user-result">
+                    <img src="${user.avatar}" width="30" height="30" style="border-radius: 50%;">
+                    ${user.username}
+                    <button onclick="sendFriendRequest('${user.username}')" style="margin-left: auto;">
+                        Добавить
+                    </button>
+                </div>
+            ).join('');
+            document.getElementById('searchResults').innerHTML = html || 'Ничего не найдено';
+        });
+
+        socket.on('new_friend_request', (data) => {
+            alert(Новая заявка от ${data.from});
+        });
+
+        socket.on('friend_added', (friend) => {
+            updateFriendsList([...getFriends(), friend]);
+        });
+
+        socket.on('new_private_message', addPrivateMessage);
+        socket.on('new_global_message', addGlobalMessage);
+        socket.on('chat_history', (data) => {
+            data.messages.forEach(addPrivateMessage);
+        });
+
+        function showApp() {
+            document.getElementById('authScreen').style.display = 'none';
+            document.getElementById('appScreen').style.display = 'flex';
+            document.getElementById('userName').textContent = currentUser.username;
+        }
+
+        function showError(error) {
+            document.getElementById('authError').textContent = error;
+        }
+
+        function updateFriendsList(friends) {
+            const html = friends.map(friend => 
+                <div class="friend-item" onclick="openPrivateChat(${JSON.stringify(friend)})">
+                    <img src="${friend.avatar}" width="30" height="30" style="border-radius: 50%;">
+                    ${friend.username}
+                    <span style="margin-left: auto; color: ${friend.online ? 'green' : 'gray'};">
+                        ●
+                    </span>
+                </div>
+            ).join('');
+            document.getElementById('friendsList').innerHTML = html || 'Друзей нет';
+        }
+function updateRequestsList(requests) {
+            const html = requests.map(req => 
+                <div class="request-item">
+                    ${req.from}
+                    <button onclick="acceptFriendRequest('${req.from}')" style="margin-left: auto;">
+                        Принять
+                    </button>
+                </div>
+            ).join('');
+            document.getElementById('requestsList').innerHTML = html || 'Заявок нет';
+        }
+
+        function getFriends() {
+            return Array.from(document.querySelectorAll('.friend-item')).map(el => {
+                return { username: el.textContent.trim().replace('●', '') };
+            });
+        }
+
+        function addPrivateMessage(message) {
+            const isOwn = message.from === currentUser.username;
+            const html = 
+                <div class="message ${isOwn ? 'own' : 'other'}">
+                    <strong>${isOwn ? 'Вы' : message.from}</strong><br>
+                    ${message.text}
+                    <div style="font-size: 12px; opacity: 0.7;">${message.time}</div>
+                </div>
+            ;
+            document.getElementById('privateMessages').innerHTML += html;
+            scrollToBottom('privateMessages');
+        }
+
+        function addGlobalMessage(message) {
+            const isOwn = message.from === currentUser.username;
+            const html = 
+                <div class="message ${isOwn ? 'own' : 'other'}">
+                    <strong>${isOwn ? 'Вы' : message.from}</strong><br>
+                    ${message.text}
+                    <div style="font-size: 12px; opacity: 0.7;">${message.time}</div>
+                </div>
+            ;
+            document.getElementById('globalMessages').innerHTML += html;
+            scrollToBottom('globalMessages');
+        }
+
+        function scrollToBottom(elementId) {
+            const element = document.getElementById(elementId);
+            element.scrollTop = element.scrollHeight;
+        }
+
+        // Отправка по Enter
+        document.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                if (document.getElementById('globalTab').classList.contains('active')) {
+                    sendGlobalMessage();
+                } else {
+                    sendPrivateMessage();
+                }
+            }
+        });
+    </script>
 </body>
 </html>
