@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TalkSpace - Мессенджер</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="authScreen" class="auth-screen">
+        <div class="auth-container">
+            <div class="app-header">
+                <h1>💬 TalkSpace</h1>
+                <p class="app-subtitle">Ваше пространство для общения</p>
+            </div>
+
+            <div class="auth-tabs">
+                <button class="auth-tab active" onclick="showAuthTab('login')">Вход</button>
+                <button class="auth-tab" onclick="showAuthTab('register')">Регистрация</button>
+            </div>
+
+            <div id="loginTab" class="auth-form active">
+                <input type="text" id="loginUsername" placeholder="Имя пользователя" class="auth-input">
+                <input type="password" id="loginPassword" placeholder="Пароль" class="auth-input">
+                <button onclick="login()" class="auth-btn">Войти в TalkSpace</button>
+            </div>
+
+            <div id="registerTab" class="auth-form">
+                <input type="text" id="registerUsername" placeholder="Придумайте имя пользователя" class="auth-input">
+                <input type="password" id="registerPassword" placeholder="Придумайте пароль" class="auth-input">
+                <div class="avatar-selection">
+                    <div class="avatar-option selected" onclick="selectAvatar(this, 'default')">
+                        <img src="https://ui-avatars.com/api/?name=User&background=667eea&color=fff" alt="Аватар">
+                    </div>
+                    <div class="avatar-option" onclick="selectAvatar(this, 'male')">
+                        <img src="https://ui-avatars.com/api/?name=User&background=4CAF50&color=fff" alt="Аватар">
+                    </div>
+                    <div class="avatar-option" onclick="selectAvatar(this, 'female')">
+                        <img src="https://ui-avatars.com/api/?name=User&background=E91E63&color=fff" alt="Аватар">
+                    </div>
+                </div>
+                <button onclick="register()" class="auth-btn">Создать аккаунт</button>
+            </div>
+
+            <div id="authError" class="error-message"></div>
+        </div>
+    </div>
+
+    <div id="appScreen" class="app" style="display: none;">
+        <div class="sidebar">
+            <div class="app-header">
+                <h1>💬 TalkSpace</h1>
+                <p class="app-subtitle" id="welcomeText">Добро пожаловать!</p>
+            </div>
+
+            <div class="user-panel">
+                <div class="user-info">
+                    <img id="userAvatar" src="" alt="Аватар" class="user-avatar">
+                    <span id="userName"></span>
+                </div>
+                <button onclick="logout()" class="logout-btn">Выйти</button>
+            </div>
+            
+            <div class="tabs">
+                <button class="tab-btn active" onclick="openTab('friends')">👥 Друзья</button>
+                <button class="tab-btn" onclick="openTab('search')">🔍 Поиск</button>
+                <button class="tab-btn" onclick="openTab('requests')">📨 Заявки</button>
+                <button class="tab-btn" onclick="openTab('global')">🌍 Общий чат</button>
+            </div>
+
+            <!-- Вкладка Друзья -->
+            <div id="friendsTab" class="tab-content active">
+                <div class="friends-list" id="friendsList">
+                    <div class="empty-state">У вас пока нет друзей</div>
+                </div>
+                <div class="private-chat" id="privateChat" style="display: none;">
+                    <div class="chat-header" id="privateChatHeader"></div>
+                    <div class="messages" id="privateMessages"></div>
+<div class="message-input">
+                        <input type="text" id="privateMessageInput" placeholder="Сообщение...">
+                        <button onclick="sendPrivateMessage()">➤</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Вкладка Поиск -->
+            <div id="searchTab" class="tab-content">
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="Введите имя пользователя..." oninput="searchUsers()">
+                </div>
+                <div class="search-results" id="searchResults">
+                    <div class="empty-state">Начните поиск пользователей</div>
+                </div>
+            </div>
+
+            <!-- Вкладка Заявки -->
+            <div id="requestsTab" class="tab-content">
+                <div class="requests-list" id="requestsList">
+                    <div class="empty-state">Заявок в друзья нет</div>
+                </div>
+            </div>
+
+            <!-- Вкладка Общий чат -->
+            <div id="globalTab" class="tab-content">
+                <div class="global-chat">
+                    <div class="chat-header">🌍 Общий TalkSpace</div>
+                    <div class="messages" id="globalMessages"></div>
+                    <div class="message-input">
+                        <input type="text" id="globalMessageInput" placeholder="Сообщение в общий чат...">
+                        <button onclick="sendGlobalMessage()">➤</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "talkspace",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "bcrypt": "^5.1.1",
+    "uuid": "^9.0.1"
+  }
+}
