@@ -16,18 +16,19 @@ const io = new Server(server);
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static(__dirname));
 
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Хранилище данных (в реальном проекте нужно использовать БД)
-let users = new Map(); // {userId: {username, passwordHash, avatar, friends: []}}
-let messages = new Map(); // {chatId: [messages]}
-let sessions = new Map(); // {socketId: userId}
+// Хранилище данных (в реальном проекте БД)
+let users = new Map();
+let messages = new Map();
+let sessions = new Map();
+let friendRequests = new Map();
 
-// Генерация chatId для личных сообщений
+// Генерация chatId
 function generateChatId(user1, user2) {
     return [user1, user2].sort().join('_');
 }
@@ -38,7 +39,8 @@ io.on('connection', (socket) => {
     // Регистрация
     socket.on('register', async (data) => {
         try {
-            if (Array.from(users.values()).find(u => u.username === data.username)) {
+            const existingUser = Array.from(users.values()).find(u => u.username === data.username);
+            if (existingUser) {
                 socket.emit('register_error', 'Имя пользователя уже занято');
                 return;
             }
@@ -52,11 +54,12 @@ io.on('connection', (socket) => {
                 passwordHash: passwordHash,
                 avatar: data.avatar || https://ui-avatars.com/api/?name=${encodeURIComponent(data.username)}&background=667eea&color=fff,
                 friends: [],
-                friendRequests: []
+                createdAt: new Date()
             };
 
             users.set(userId, user);
             sessions.set(socket.id, userId);
+            friendRequests.set(userId, []);
 
             socket.emit('register_success', {
                 user: {
@@ -66,14 +69,10 @@ io.on('connection', (socket) => {
                 }
             });
 
-            io.emit('users_update', Array.from(users.values()).map(u => ({
-                id: u.id,
-                username: u.username,
-                avatar: u.avatar,
-                online: Array.from(sessions.values()).includes(u.id)
-            })));
+            updateOnlineUsers();
 
         } catch (error) {
+            console.error('Register error:', error);
             socket.emit('register_error', 'Ошибка регистрации');
         }
     });
@@ -95,6 +94,20 @@ io.on('connection', (socket) => {
 
             sessions.set(socket.id, user.id);
 
+            // Получаем данные друзей
+            const friendsData = user.friends.map(friendId => {
+                const friend = users.get(friendId);
+                return friend ? {
+                    id: friend.id,
+                    username: friend.username,
+                    avatar: friend.avatar,
+                    online: Array.from(sessions.values()).includes(friend.id)
+                } : null;
+            }).filter(Boolean);
+
+            // Получаем заявки в друзья
+            const requests = friendRequests.get(user.id) || [];
+
             socket.emit('login_success', {
                 user: {
                     id: user.id,
@@ -102,24 +115,20 @@ io.on('connection', (socket) => {
                     avatar: user.avatar,
                     friends: user.friends
                 },
-                friends: user.friends.map(friendId => {
-                    const friend = users.get(friendId);
-                    return {
-                        id: friend.id,
-                        username: friend.username,
-                        avatar: friend.avatar,
-                        online: Array.from(sessions.values()).includes(friend.id)
-                    };
-                })
+                friends: friendsData,
+                friendRequests: requests.map(reqId => {
+                    const reqUser = users.get(reqId);
+                    return reqUser ? {
+                        id: reqUser.id,
+                        username: reqUser.username,
+                        avatar: reqUser.avatar
+                    } : null;
+                }).filter(Boolean)
             });
+updateOnlineUsers();
 
-            io.emit('users_update', Array.from(users.values()).map(u => ({
-                id: u.id,
-                username: u.username,
-                avatar: u.avatar,
-                online: Array.from(sessions.values()).includes(u.id)
-            })));
-} catch (error) {
+        } catch (error) {
+            console.error('Login error:', error);
             socket.emit('login_error', 'Ошибка входа');
         }
     });
@@ -129,6 +138,8 @@ io.on('connection', (socket) => {
         const currentUserId = sessions.get(socket.id);
         const currentUser = users.get(currentUserId);
         
+        if (!currentUser) return;
+
         const results = Array.from(users.values())
             .filter(u => 
                 u.id !== currentUserId && 
@@ -138,7 +149,8 @@ io.on('connection', (socket) => {
             .map(u => ({
                 id: u.id,
                 username: u.username,
-                avatar: u.avatar
+                avatar: u.avatar,
+                online: Array.from(sessions.values()).includes(u.id)
             }));
 
         socket.emit('search_results', results);
@@ -147,20 +159,38 @@ io.on('connection', (socket) => {
     // Отправка заявки в друзья
     socket.on('send_friend_request', (targetUserId) => {
         const currentUserId = sessions.get(socket.id);
+        const currentUser = users.get(currentUserId);
         const targetUser = users.get(targetUserId);
 
-        if (targetUser && !targetUser.friendRequests.includes(currentUserId)) {
-            targetUser.friendRequests.push(currentUserId);
-            socket.emit('friend_request_sent');
-            
-            // Уведомление целеому пользователю, если он онлайн
-            const targetSocket = findSocketByUserId(targetUserId);
-            if (targetSocket) {
-                targetSocket.emit('new_friend_request', {
-                    from: users.get(currentUserId).username,
-                    fromId: currentUserId
-                });
-            }
+        if (!currentUser || !targetUser) return;
+
+        // Проверяем нет ли уже заявки
+        const targetRequests = friendRequests.get(targetUserId) || [];
+        if (targetRequests.includes(currentUserId)) {
+            socket.emit('friend_request_error', 'Заявка уже отправлена');
+            return;
+        }
+
+        // Проверяем не друзья ли уже
+        if (currentUser.friends.includes(targetUserId)) {
+            socket.emit('friend_request_error', 'Пользователь уже в друзьях');
+            return;
+        }
+
+        // Добавляем заявку
+        targetRequests.push(currentUserId);
+        friendRequests.set(targetUserId, targetRequests);
+
+        socket.emit('friend_request_sent');
+        
+        // Уведомление целевому пользователю
+        const targetSocket = findSocketByUserId(targetUserId);
+        if (targetSocket) {
+            targetSocket.emit('new_friend_request', {
+                fromId: currentUserId,
+                fromUsername: currentUser.username,
+                fromAvatar: currentUser.avatar
+            });
         }
     });
 
@@ -170,36 +200,54 @@ io.on('connection', (socket) => {
         const currentUser = users.get(currentUserId);
         const fromUser = users.get(fromUserId);
 
-        if (currentUser.friendRequests.includes(fromUserId)) {
-            // Удаляем из заявок
-            currentUser.friendRequests = currentUser.friendRequests.filter(id => id !== fromUserId);
-            
-            // Добавляем в друзья
-            if (!currentUser.friends.includes(fromUserId)) {
-                currentUser.friends.push(fromUserId);
-            }
-            if (!fromUser.friends.includes(currentUserId)) {
-                fromUser.friends.push(currentUserId);
-            }
+        if (!currentUser || !fromUser) return;
 
-            // Обновляем обоих пользователей
-            socket.emit('friend_added', {
-                id: fromUser.id,
-                username: fromUser.username,
-                avatar: fromUser.avatar,
-                online: Array.from(sessions.values()).includes(fromUser.id)
-            });
-
-            const fromSocket = findSocketByUserId(fromUserId);
-            if (fromSocket) {
-                fromSocket.emit('friend_added', {
-                    id: currentUser.id,
-                    username: currentUser.username,
-                    avatar: currentUser.avatar,
-                    online: true
-                });
-            }
+        const currentRequests = friendRequests.get(currentUserId) || [];
+        if (!currentRequests.includes(fromUserId)) {
+            socket.emit('friend_request_error', 'Заявка не найдена');
+            return;
         }
+
+        // Удаляем из заявок
+        friendRequests.set(currentUserId, currentRequests.filter(id => id !== fromUserId));
+        
+        // Добавляем в друзья
+        if (!currentUser.friends.includes(fromUserId)) {
+            currentUser.friends.push(fromUserId);
+        }
+        if (!fromUser.friends.includes(currentUserId)) {
+            fromUser.friends.push(currentUserId);
+        }
+
+        // Обновляем обоих пользователей
+        const friendData = {
+            id: fromUser.id,
+            username: fromUser.username,
+            avatar: fromUser.avatar,
+            online: Array.from(sessions.values()).includes(fromUser.id)
+        };
+
+        socket.emit('friend_added', friendData);
+
+        const fromSocket = findSocketByUserId(fromUserId);
+        if (fromSocket) {
+            fromSocket.emit('friend_added', {
+                id: currentUser.id,
+                username: currentUser.username,
+                avatar: currentUser.avatar,
+                online: true
+            });
+        }
+
+        updateOnlineUsers();
+    });
+// Отклонение заявки в друзья
+    socket.on('decline_friend_request', (fromUserId) => {
+        const currentUserId = sessions.get(socket.id);
+        const currentRequests = friendRequests.get(currentUserId) || [];
+        
+        friendRequests.set(currentUserId, currentRequests.filter(id => id !== fromUserId));
+        socket.emit('friend_request_declined', fromUserId);
     });
 
     // Личные сообщения
@@ -207,7 +255,7 @@ io.on('connection', (socket) => {
         const currentUserId = sessions.get(socket.id);
         const currentUser = users.get(currentUserId);
         
-        if (!currentUser.friends.includes(data.to)) {
+        if (!currentUser || !currentUser.friends.includes(data.to)) {
             socket.emit('message_error', 'Этот пользователь не в ваших друзьях');
             return;
         }
@@ -216,6 +264,8 @@ io.on('connection', (socket) => {
         const message = {
             id: uuidv4(),
             from: currentUserId,
+            fromUsername: currentUser.username,
+            fromAvatar: currentUser.avatar,
             to: data.to,
             text: data.text,
             time: new Date().toLocaleTimeString(),
@@ -236,15 +286,22 @@ io.on('connection', (socket) => {
             targetSocket.emit('new_private_message', message);
         }
     });
-// Загрузка истории сообщений
+
+    // Загрузка истории сообщений
     socket.on('load_chat_history', (friendId) => {
         const currentUserId = sessions.get(socket.id);
         const chatId = generateChatId(currentUserId, friendId);
         
         if (messages.has(chatId)) {
+            const chatMessages = messages.get(chatId);
             socket.emit('chat_history', {
                 friendId: friendId,
-                messages: messages.get(chatId)
+                messages: chatMessages
+            });
+        } else {
+            socket.emit('chat_history', {
+                friendId: friendId,
+                messages: []
             });
         }
     });
@@ -254,15 +311,23 @@ io.on('connection', (socket) => {
         const currentUserId = sessions.get(socket.id);
         const currentUser = users.get(currentUserId);
 
+        if (!currentUser) return;
+
         const message = {
             from: currentUserId,
             username: currentUser.username,
             avatar: currentUser.avatar,
             text: text,
-            time: new Date().toLocaleTimeString()
+            time: new Date().toLocaleTimeString(),
+            timestamp: Date.now()
         };
 
         io.emit('new_global_message', message);
+    });
+
+    // Получение онлайн пользователей
+    socket.on('get_online_users', () => {
+        updateOnlineUsers();
     });
 
     socket.on('disconnect', () => {
@@ -270,12 +335,7 @@ io.on('connection', (socket) => {
         sessions.delete(socket.id);
         
         if (userId) {
-            io.emit('users_update', Array.from(users.values()).map(u => ({
-                id: u.id,
-                username: u.username,
-                avatar: u.avatar,
-                online: Array.from(sessions.values()).includes(u.id)
-            })));
+            setTimeout(() => updateOnlineUsers(), 1000);
         }
     });
 
@@ -287,8 +347,19 @@ io.on('connection', (socket) => {
         }
         return null;
     }
+
+    function updateOnlineUsers() {
+        const onlineUsers = Array.from(users.values()).map(u => ({
+            id: u.id,
+            username: u.username,
+            avatar: u.avatar,
+            online: Array.from(sessions.values()).includes(u.id)
+        }));
+        io.emit('users_update', onlineUsers);
+    }
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(TalkSpace server running on port ${PORT});
+    console.log(✅ TalkSpace server running on port ${PORT});
+    console.log(📍 http://localhost:${PORT});
 });
